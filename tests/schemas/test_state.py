@@ -1,4 +1,4 @@
-from lib.schemas.player_state import PlayerStateState
+from lib.schemas.player_state import PlayerState
 from lib.schemas.state import GameState
 
 

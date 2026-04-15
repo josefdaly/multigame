@@ -1,8 +1,10 @@
 import math
 import pyxel
+from queue import Empty
 
 from .player import Player
-from lib.schemas.state import GameState
+from .schemas.state import GameState
+
 
 # Sprite sheet layout in image bank 0 — 3 rows of 3 frames each (8x8 px per frame):
 #   v=0:  side-walk  (shared for left & right; left is drawn with w=-8 to flip)
@@ -47,29 +49,29 @@ ACCEL = 0.1                # speed gained per frame (reaches SPEED in ~7 frames)
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, uuid_str=None, listen_queue=None, broadcast_queue=None):
         pyxel.init(160, 120, title="Roguelike")
 
         for direction, (v_offset, frames) in SPRITE_SHEET.items():
             for i, frame_data in enumerate(frames):
                 pyxel.images[0].set(i * 8, v_offset, frame_data)
 
+        self.uuid = uuid_str
+        self.listen_queue = listen_queue
+        self.broadcast_queue = broadcast_queue
+
         self.player = Player(
             x=76.0,
             y=56.0,
-            direction="down",   # "right" | "left" | "up" | "down"
+            direction="down",
             moving=False,
             anim_tick=0,
             vx=0.0,
             vy=0.0,
         )
-        self.state = GameState(players=[self.player.state])
+        self.players: list[Player] = [self.player]
 
         pyxel.run(self.update, self.draw)
-
-    @property
-    def players(self):
-        return self.state.players
 
     def _handle_input(self):
         dx = 0
@@ -77,12 +79,16 @@ class Game:
 
         if pyxel.btn(pyxel.KEY_LEFT):
             dx -= 1
+            self.player.dirty = True
         if pyxel.btn(pyxel.KEY_RIGHT):
             dx += 1
+            self.player.dirty = True
         if pyxel.btn(pyxel.KEY_UP):
             dy -= 1
+            self.player.dirty = True
         if pyxel.btn(pyxel.KEY_DOWN):
             dy += 1
+            self.player.dirty = True
 
         if dx != 0 or dy != 0:
             self.player.moving = True
@@ -112,17 +118,56 @@ class Game:
         self.player.x = max(0.0, min(152.0, self.player.x + self.player.vx))
         self.player.y = max(0.0, min(112.0, self.player.y + self.player.vy))
 
+    def _animate_player(self, player):
+        if player.moving:
+            player.anim_tick += 1
+        else:
+            player.anim_tick = 0
+
+    def _handle_broadcast(self):
+        if self.uuid and self.player.dirty:
+            state = self._serialize_state()
+            msg = state.json()
+            self.broadcast_queue.put(msg)
+
+    def _listen_for_updates(self):
+        if self.uuid and self.listen_queue:
+            try:
+                msg = self.listen_queue.get_nowait()
+            except Empty:
+                return
+            game_state = GameState.parse_raw(msg)
+            if game_state.uuid == self.uuid:
+                return
+            else:
+                for player_state in game_state.players:
+                    if player_state.uuid == self.player.uuid:
+                        continue
+                    matching_players = [p for p in self.players if p.uuid == player_state.uuid]
+                    if matching_players:
+                        matching_players[0].apply_state(player_state)
+                    else:
+                        new_player = Player.from_state(player_state)
+                        self.players.append(new_player)
+
+    def _serialize_state(self):
+        """Serialize the full game state to a GameState schema for the network boundary."""
+        return GameState(
+            uuid=self.uuid,
+            players=[player.to_state() for player in self.players],
+        )
+
     def update(self):
         if pyxel.btnp(pyxel.KEY_Q):
             pyxel.quit()
         self.player.moving = False
 
         self._handle_input()
+        self._animate_player(self.player)
+        self._handle_broadcast()
+        self._listen_for_updates()
 
-        if self.player.moving:
-            self.player.anim_tick += 1
-        else:
-            self.player.anim_tick = 0
+        self.player.dirty = False
 
     def _render_player(self, player):
         if player.moving:

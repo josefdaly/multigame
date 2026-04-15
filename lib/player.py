@@ -1,76 +1,62 @@
-import uuid
+import uuid as uuid_lib
 
 from lib.schemas.player_state import PlayerState
 
+
 class Player:
-    def __init__(self, x, y, direction, moving, anim_tick, vx, vy):
-        self.state = PlayerState(
-            uuid=str(uuid.uuid4()),
-            x=x,
-            y=y,
-            direction=direction,
-            moving=moving,
-            anim_tick=anim_tick,
-            vx=vx,
-            vy=vy,
+    def __init__(self, x: float, y: float, direction: str, moving: bool, anim_tick: int, vx: float, vy: float):
+        self.uuid: str = str(uuid_lib.uuid4())
+        self.x: float = x
+        self.y: float = y
+        self.direction: str = direction
+        self.moving: bool = moving
+        self.anim_tick: int = anim_tick
+        self.vx: float = vx
+        self.vy: float = vy
+        
+        self.dirty: bool = False  # Whether this player's state has changed since the last update   
+
+    def to_state(self) -> PlayerState:
+        """Serialize runtime state to a PlayerState schema for the network boundary."""
+        return PlayerState(
+            uuid=self.uuid,
+            x=self.x,
+            y=self.y,
+            direction=self.direction,
+            moving=self.moving,
+            anim_tick=self.anim_tick,
+            vx=self.vx,
+            vy=self.vy,
         )
 
-    @property
-    def uuid(self):
-        return self.state.uuid
-    
-    @property
-    def x(self):
-        return self.state.x
-    
-    @x.setter
-    def x(self, value):
-        self.state.x = value
+    @classmethod
+    def from_state(cls, state: PlayerState) -> "Player":
+        """Construct a Player from a fully-populated PlayerState (e.g. on network join)."""
+        player = cls(
+            x=state.x,
+            y=state.y,
+            direction=state.direction,
+            moving=state.moving,
+            anim_tick=state.anim_tick,
+            vx=state.vx,
+            vy=state.vy,
+        )
+        player.uuid = state.uuid
+        return player
 
-    @property
-    def y(self):
-        return self.state.y
-
-    @y.setter
-    def y(self, value):
-        self.state.y = value
-
-    @property
-    def direction(self):
-        return self.state.direction
-
-    @direction.setter
-    def direction(self, value):
-        self.state.direction = value
-
-    @property
-    def moving(self):
-        return self.state.moving
-
-    @moving.setter
-    def moving(self, value):
-        self.state.moving = value
-
-    @property
-    def anim_tick(self):
-        return self.state.anim_tick
-
-    @anim_tick.setter
-    def anim_tick(self, value):
-        self.state.anim_tick = value
-
-    @property
-    def vx(self):
-        return self.state.vx
-
-    @vx.setter
-    def vx(self, value):
-        self.state.vx = value
-
-    @property
-    def vy(self):
-        return self.state.vy
-
-    @vy.setter
-    def vy(self, value):
-        self.state.vy = value
+    def apply_state(self, state: PlayerState) -> None:
+        """Merge non-None fields from a partial PlayerState update onto this player."""
+        if state.x is not None:
+            self.x = state.x
+        if state.y is not None:
+            self.y = state.y
+        if state.direction is not None:
+            self.direction = state.direction
+        if state.moving is not None:
+            self.moving = state.moving
+        if state.anim_tick is not None:
+            self.anim_tick = state.anim_tick
+        if state.vx is not None:
+            self.vx = state.vx
+        if state.vy is not None:
+            self.vy = state.vy

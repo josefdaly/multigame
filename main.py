@@ -1,3 +1,4 @@
+import json
 import argparse
 import asyncio
 import websockets
@@ -8,16 +9,28 @@ from queue import Queue
 from lib.game import Game
 
 
-async def listen(url="ws://localhost:8765"):
+async def listen(url, queue):
     async with websockets.connect(url) as ws:
         while True:
             msg = await ws.recv()
-            # Update game state based on message
+            queue.put(msg)
             print(f"Received: {msg}")
 
 
-def create_connection(url, uuid_str):
-    asyncio.run(listen(url))
+async def broadcast(url, queue):
+    async with websockets.connect(url) as ws:
+        while True:
+            msg = queue.get()  # Blocking wait for message to send
+            await ws.send(msg)
+            print(f"Sent: {msg}")
+
+
+def listen_handler(url, queue):
+    asyncio.run(listen(url, queue))
+
+
+def broadcast_handler(url, queue):
+    asyncio.run(broadcast(url, queue))
 
 
 if __name__ == "__main__":
@@ -32,5 +45,6 @@ if __name__ == "__main__":
         uuid_str = str(uuid.uuid4())
         listen_queue = Queue()
         broadcast_queue = Queue()
-        threading.Thread(target=start_network, args=(options.server_url, uuid_str, listen_queue, broadcast_queue), daemon=True).start()
-    Game()
+        threading.Thread(target=listen_handler, args=(options.server_url, listen_queue), daemon=True).start()
+        threading.Thread(target=broadcast_handler, args=(options.server_url, broadcast_queue), daemon=True).start()
+    Game(uuid_str=uuid_str, listen_queue=listen_queue, broadcast_queue=broadcast_queue)
