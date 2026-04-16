@@ -17,7 +17,6 @@ class Player:
         self.dirty: bool = False  # Whether this player's state has changed since the last update   
 
     def to_state(self) -> PlayerState:
-        """Serialize runtime state to a PlayerState schema for the network boundary."""
         return PlayerState(
             uuid=self.uuid,
             x=self.x,
@@ -31,7 +30,6 @@ class Player:
 
     @classmethod
     def from_state(cls, state: PlayerState) -> "Player":
-        """Construct a Player from a fully-populated PlayerState (e.g. on network join)."""
         player = cls(
             x=state.x,
             y=state.y,
@@ -45,7 +43,6 @@ class Player:
         return player
 
     def apply_state(self, state: PlayerState) -> None:
-        """Merge non-None fields from a partial PlayerState update onto this player."""
         if state.x is not None:
             self.x = state.x
         if state.y is not None:

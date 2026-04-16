@@ -96,7 +96,6 @@ class Game:
             target_vx = (dx / length) * SPEED
             target_vy = (dy / length) * SPEED
 
-            # Accelerate velocity vector toward target; caps step at ACCEL per frame
             diff_x = target_vx - self.player.vx
             diff_y = target_vy - self.player.vy
             diff_len = math.sqrt(diff_x * diff_x + diff_y * diff_y)
@@ -106,7 +105,6 @@ class Game:
                 self.player.vx += (diff_x / diff_len) * ACCEL
                 self.player.vy += (diff_y / diff_len) * ACCEL
 
-            # Horizontal takes priority for facing direction
             if dx != 0:
                 self.player.direction = "right" if dx > 0 else "left"
             else:
@@ -151,7 +149,6 @@ class Game:
                         self.players.append(new_player)
 
     def _serialize_state(self):
-        """Serialize the full game state to a GameState schema for the network boundary."""
         return GameState(
             uuid=self.uuid,
             players=[player.to_state() for player in self.players],
@@ -174,7 +171,7 @@ class Game:
             cycle_pos = (player.anim_tick // ANIM_SPEED) % len(ANIM_CYCLE)
             frame_idx = ANIM_CYCLE[cycle_pos]
         else:
-            frame_idx = 1  # neutral standing frame
+            frame_idx = 1 
 
         u = frame_idx * 8
 
@@ -184,7 +181,7 @@ class Game:
         elif player.direction == "down":
             v = SPRITE_SHEET["down"][0]
             w = 8
-        else:  # up
+        else: 
             v = SPRITE_SHEET["up"][0]
             w = 8
 

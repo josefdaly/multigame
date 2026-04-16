@@ -20,7 +20,7 @@ async def listen(url, queue):
 async def broadcast(url, queue):
     async with websockets.connect(url) as ws:
         while True:
-            msg = queue.get()  # Blocking wait for message to send
+            msg = queue.get()
             await ws.send(msg)
             print(f"Sent: {msg}")
 
