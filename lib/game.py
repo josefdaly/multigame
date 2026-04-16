@@ -129,24 +129,26 @@ class Game:
             self.broadcast_queue.put(msg)
 
     def _listen_for_updates(self):
-        if self.uuid and self.listen_queue:
+        if not (self.uuid and self.listen_queue):
+            return
+        latest: dict[str, "PlayerState"] = {}
+        while True:
             try:
                 msg = self.listen_queue.get_nowait()
             except Empty:
-                return
+                break
             game_state = GameState.parse_raw(msg)
             if game_state.uuid == self.uuid:
-                return
+                continue
+            for player_state in game_state.players:
+                if player_state.uuid != self.player.uuid:
+                    latest[player_state.uuid] = player_state
+        for player_state in latest.values():
+            matching_players = [p for p in self.players if p.uuid == player_state.uuid]
+            if matching_players:
+                matching_players[0].apply_state(player_state)
             else:
-                for player_state in game_state.players:
-                    if player_state.uuid == self.player.uuid:
-                        continue
-                    matching_players = [p for p in self.players if p.uuid == player_state.uuid]
-                    if matching_players:
-                        matching_players[0].apply_state(player_state)
-                    else:
-                        new_player = Player.from_state(player_state)
-                        self.players.append(new_player)
+                self.players.append(Player.from_state(player_state))
 
     def _serialize_state(self):
         return GameState(
